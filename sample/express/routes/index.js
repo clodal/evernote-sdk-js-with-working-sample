@@ -8,13 +8,12 @@ var callbackUrl = "http://localhost:3000/oauth_callback";
  * This is derived from the oAuthAccessToken which has a max expiry of 1 year.
  * @type {string}
  */
-const TOKEN = 'S=s1:U=96ac1:E=18822d69808:C=180cb256c08:P=185:A=joel-7475:V=2:H=65c804c278261d12c4925659022f0622'
 
 // home page
 exports.index = async function(req, res) {
   try {
-    if (TOKEN || req.session.oauthAccessToken) {
-      var token = TOKEN || req.session.oauthAccessToken;
+    if (config.TOKEN || req.session.oauthAccessToken) {
+      var token = config.TOKEN || req.session.oauthAccessToken;
       var client = new Evernote.Client({
         token,
         sandbox: config.SANDBOX,
