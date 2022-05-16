@@ -3,24 +3,58 @@ var Evernote = require('evernote');
 var config = require('../config.json');
 var callbackUrl = "http://localhost:3000/oauth_callback";
 
+/**
+ * Set this as the lambda's token.
+ * This is derived from the oAuthAccessToken which has a max expiry of 1 year.
+ * @type {string}
+ */
+const TOKEN = 'S=s1:U=96ac1:E=18822d69808:C=180cb256c08:P=185:A=joel-7475:V=2:H=65c804c278261d12c4925659022f0622'
+
 // home page
-exports.index = function(req, res) {
-  if (req.session.oauthAccessToken) {
-    var token = req.session.oauthAccessToken;
-    var client = new Evernote.Client({
-      token: token,
-      sandbox: config.SANDBOX,
-      china: config.CHINA
-    });
-    client.getNoteStore().listNotebooks().then(function(notebooks) {
+exports.index = async function(req, res) {
+  try {
+    if (TOKEN || req.session.oauthAccessToken) {
+      var token = TOKEN || req.session.oauthAccessToken;
+      var client = new Evernote.Client({
+        token,
+        sandbox: config.SANDBOX,
+        china: config.CHINA
+      });
+      const noteStore = await client.getNoteStore()
+
+      // List Notebooks
+      const notebooks = await noteStore.listNotebooks()
       req.session.notebooks = notebooks;
+
+      // List notes of the first notebook
+      const filter = new Evernote.NoteStore.NoteFilter({
+        notebookGuid: notebooks[0].guid,
+        // words: ['one', 'two', 'three'],
+        // ascending: true
+      });
+      const spec = new Evernote.NoteStore.NotesMetadataResultSpec({
+        includeTitle: true,
+        includeContentLength: true,
+        includeCreated: true,
+        includeUpdated: true,
+        includeDeleted: true,
+        includeUpdateSequenceNum: true,
+        includeNotebookGuid: true,
+        includeTagGuids: true,
+        includeAttributes: true,
+        includeLargestResourceMime: true,
+        includeLargestResourceSize: true,
+      });
+      const notesMetadata = await noteStore.findNotesMetadata(filter, 0, 500, spec)
+      req.session.notes = notesMetadata.notes
+
+      // Render
       res.render('index', {session: req.session});
-    }, function(error) {
-      req.session.error = JSON.stringify(error);
+    } else {
       res.render('index', {session: req.session});
-    });
-  } else {
-    res.render('index', {session: req.session});
+    }
+  } catch (err) {
+  	console.error('Error caught:', err)
   }
 };
 
@@ -58,8 +92,8 @@ exports.oauth_callback = function(req, res) {
   });
 
   client.getAccessToken(
-    req.session.oauthToken, 
-    req.session.oauthTokenSecret, 
+    req.session.oauthToken,
+    req.session.oauthTokenSecret,
     req.query.oauth_verifier,
     function(error, oauthAccessToken, oauthAccessTokenSecret, results) {
       if (error) {
